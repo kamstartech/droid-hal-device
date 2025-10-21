@@ -170,13 +170,13 @@ such_macro supports spaces\
 # can be change once android-tools has been updated
 %bcond_without dhd_tools
 
-Summary: 	Droid HAL package for %{rpm_device}
-License: 	BSD
-Name: 		droid-hal-%{rpm_device}
-Version: 	0.0.6
+Summary:       Droid HAL package for %{rpm_device}
+License:       BSD
+Name:          droid-hal-%{rpm_device}
+Version:       0.0.6
 # timestamped releases are used only for HADK (mb2) builds
 %if 0%{?_obs_build_project:1}
-Release: 	1
+Release:       1
 %if 0%{?droid_src_build:1}
 Source0: droid-hal-%{rpm_device}-%{version}.tar.bz2
 BuildRequires: droid-bin-src-full
@@ -184,19 +184,19 @@ BuildRequires: droid-bin-src-full
 # The repo sync service on OBS prepares a 'source tarball' of the rpm
 # dir since we currently have a complex setup with subdirs which OBS
 # doesn't like. This is not a problem for local builds.
-Source0: 	rpm.tar.bzip2
+Source0:       rpm.tar.bzip2
 # This is actual droid source from the repo service when run on OBS.
 # local builds don't mind if this is missing
-Source40:       repo.tar.bzip2
+Source40:      repo.tar.bzip2
 %endif
 %else
 %define rel_date %(date +'%%Y%%m%%d%%H%%M')
-Release: 	%{rel_date}
+Release:       %{rel_date}
 %endif
 # Reserve Source50 onwards
 # Allow device specific sources to be defined using dhd_sources
 %{?dhd_sources}
-Provides:	droid-hal
+Provides:      droid-hal
 
 BuildRequires:  oneshot
 BuildRequires:  pkgconfig(systemd)
@@ -1128,7 +1128,6 @@ done
 # Begin files section
 
 %files -f tmp/droid-hal.files
-%defattr(-,root,root,-)
 %dir /data
 /sbin/*
 # This binary should probably move to /sbin/
@@ -1140,7 +1139,6 @@ done
 %{_libexecdir}/droid-hybris/system/bin/
 
 # Non executable files
-%defattr(644,root,root,-)
 %{_unitdir}
 # hybris and /dev/alog/ libraries
 %{_libexecdir}/droid-hybris/system/lib/
@@ -1164,7 +1162,6 @@ done
 %{_prefix}/lib/droid/hw-group.d/*.list*
 
 %files devel
-%defattr(644,root,root,-)
 %{_includedir}/droid-devel/
 %if 0%{?_obs_build_project:1}
 # this hack fixes OBS i586 worker failure
@@ -1175,22 +1172,18 @@ done
 
 %if %{with dhd_tools}
 %files tools -f tools.files
-%defattr(-,root,root,-)
 %{_bindir}/mkbootimg
 %{_bindir}/img2simg
 %{_bindir}/simg2img
 %endif
 
 %files kernel -f kernel.files
-%defattr(644,root,root,-)
 
 %files kernel-modules
-%defattr(644,root,root,-)
 /lib/modules
 
 %if 0%{!?have_custom_img_boot:1}
 %files img-boot
-%defattr(644,root,root,-)
 /boot/hybris-boot.img
 %if 0%{?installable_zip:1}
 /boot/update-binary
@@ -1201,32 +1194,26 @@ done
 
 %if 0%{!?have_custom_img_recovery:1}
 %files img-recovery
-%defattr(644,root,root,-)
 /boot/hybris-recovery.img
 %endif
 
 %if 0%{?bootloader_binary:1}
 %files aboot
-%defattr(644,root,root,-)
 /boot/%{?bootloader_binary}
 %endif
 
 %if 0%{?straggler_files:1}
 %files detritus
-%defattr(644,root,root,-)
 %{?straggler_files}
 %endif
 
 %files kernel-dtbo -f dtbo.files
-%defattr(644,root,root,-)
 
 %if 0%{!?have_custom_vendor_boot:1}
 %if 0%{?enable_vendor_boot_update:1}
 %files vendor_boot
 /boot/vendor_boot.img
-%defattr(644,root,root,-)
 %endif
 %else
 %files kernel-modules-vendor_boot -f kernel-modules-vendor_boot.files
-%defattr(644,root,root,-)
 %endif
