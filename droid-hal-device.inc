@@ -612,6 +612,7 @@ mkdir -p $RPM_BUILD_ROOT/boot
 mkdir -p $RPM_BUILD_ROOT/lib/modules
 
 # Install tools
+%if %{with dhd_tools}
 if [ $android_version_major -ge "11" ]; then
     mkbootimg_dir=tools
 else
@@ -634,6 +635,7 @@ fi
 
 install -m 755 -D %{android_root}/system/core/libsparse/simg2img %{buildroot}/%{_bindir}/
 install -m 755 -D %{android_root}/system/core/libsparse/img2simg %{buildroot}/%{_bindir}/
+%endif
 
 # Install
 %if 0%{?installable_zip:1}
