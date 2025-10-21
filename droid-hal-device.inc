@@ -440,7 +440,18 @@ if ubu-chroot -V ; then
 fi
 
 echo Running droid build in HABUILD_SDK
-ubu-chroot -r /srv/mer/sdks/ubu ${bash} "set -o errexit; cd %android_root; %{?pre_actions}%{!?pre_actions:true}; source build/envsetup.sh; lunch %{?lunch_device}%{!?lunch_device:%{device}}%{?device_variant}; rm -f .repo/local_manifests/roomservice.xml; make %{?_smp_mflags} %{?hadk_make_target}%{!?hadk_make_target:hybris-hal}"
+ubu-chroot -r /srv/mer/sdks/ubu ${bash} "
+    set -o errexit;
+    cd %android_root;
+    export KBUILD_BUILD_USER=jolla;
+    export KBUILD_BUILD_HOST=jollabuild;
+    export KBUILD_BUILD_TIMESTAMP=\"$(date -d "@$SOURCE_DATE_EPOCH")\";
+    export SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH;
+    %{?pre_actions}%{!?pre_actions:true};
+    source build/envsetup.sh;
+    lunch %{?lunch_device}%{!?lunch_device:%{device}}%{?device_variant};
+    rm -f .repo/local_manifests/roomservice.xml;
+    make %{?_smp_mflags} %{?hadk_make_target}%{!?hadk_make_target:hybris-hal}"
 %endif
 
 # Make a tmp location for built installables
@@ -568,10 +579,10 @@ cat > tmp/hw-release <<EOF
 # and hw-release.vars for use at build time
 MER_HA_DEVICE=%{rpm_device}
 MER_HA_VENDOR=%{rpm_vendor}
-MER_HA_VERSION="%{version}.%{_obs_build_count} %{_version_appendix}"
-MER_HA_VERSION_ID=%{version}.%{_obs_build_count}
-MER_HA_PRETTY_NAME="%{rpm_device} %{version}.%{_obs_build_count} %{_version_appendix}"
-MER_HA_SAILFISH_BUILD=%{_obs_build_count}
+MER_HA_VERSION="%{version}.%{_obs_commit_count} %{_version_appendix}"
+MER_HA_VERSION_ID=%{version}.%{_obs_commit_count}
+MER_HA_PRETTY_NAME="%{rpm_device} %{version}.%{_obs_commit_count} %{_version_appendix}"
+MER_HA_SAILFISH_BUILD=%{_obs_commit_count}
 MER_HA_SAILFISH_FLAVOUR=%{_build_flavour}
 MER_HA_HOME_URL="https://sailfishos.org/"
 EOF
