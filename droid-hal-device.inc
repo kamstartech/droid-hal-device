@@ -198,6 +198,9 @@ Release:       %{rel_date}
 %{?dhd_sources}
 Provides:      droid-hal
 
+# Ignore dependencies in OBS that are not resolvable and/or not needed in build.
+#!BuildIgnore: droid-config-flashing
+
 BuildRequires:  oneshot
 BuildRequires:  pkgconfig(systemd)
 BuildRequires:  qt5-qttools-kmap2qmap >= 5.1.0+git5
