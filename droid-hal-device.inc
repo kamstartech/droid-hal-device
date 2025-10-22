@@ -739,13 +739,23 @@ if [ $android_version_major -ge "10" ]; then
 
     rm -f $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib/lib{dl,dl_android,c,m}.so
     cp -a \
-        $art_path/$apex_path/lib/bionic/lib{dl,dl_android,c,m}.so \
+        $art_path/$apex_path/lib/bionic/lib{dl,c,m}.so \
         $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib
+    if [ $android_version_major -ge "12" ]; then
+        cp -a \
+            $art_path/$apex_path/lib/bionic/libdl_android.so \
+            $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib
+    fi
 %if 0%{?droid_target_aarch64:1}
     rm -f $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64/lib{dl,dl_android,c,m}.so
     cp -a \
-        $art_path/$apex_path/lib64/bionic/lib{dl,dl_android,c,m}.so \
+        $art_path/$apex_path/lib64/bionic/lib{dl,c,m}.so \
         $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64
+    if [ $android_version_major -ge "12" ]; then
+        cp -a \
+            $art_path/$apex_path/lib64/bionic/libdl_android.so \
+            $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64
+    fi
 %endif
 fi
 
