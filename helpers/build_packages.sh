@@ -394,11 +394,13 @@ if [ "$BUILDIMAGE" = "1" ]; then
         tokenmap="ARCH:$PORT_ARCH,RELEASE:live,EXTRA_NAME:$EXTRA_NAME,FLAVOUR:devel"
         flavour=devel
     else
-        tokenmap="ARCH:$PORT_ARCH,RELEASE:$RELEASE,EXTRA_NAME:$EXTRA_NAME"
+        [ -n "$RELEASE" ] || die 'Please set the desired RELEASE variable in ~/.hadk.env to build an image for'
+        RELEASEMAJORMINOR=$(echo "$RELEASE" | cut -d '.' -f 1,2)
+        RELEASEMAJOR=$(echo "$RELEASE" | cut -d '.' -f 1)
+        tokenmap="ARCH:$PORT_ARCH,RELEASE:$RELEASE,RELEASEMAJORMINOR:$RELEASEMAJORMINOR,RELEASEMAJOR:$RELEASEMAJOR,EXTRA_NAME:$EXTRA_NAME"
         flavour=release
         # Clear out extra store repositories from kickstart if exist
         sed -i "/store-repository.jolla.com/d" "$ks"
-        [ -n "$RELEASE" ] || die 'Please set the desired RELEASE variable in ~/.hadk.env to build an image for'
     fi
     if [ -n $RELEASE ]; then
         release_version="-"$RELEASE
