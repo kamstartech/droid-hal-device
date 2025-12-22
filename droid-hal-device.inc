@@ -33,7 +33,9 @@
 # enable_dtbo_update:
 #                    ability to flash dtbo partition, inspect the usage of this
 #                      macro
-#
+# enable_init_boot_update:
+#                    ability to flash init_boot partition, inspect the usage of
+#                      this macro
 # enable_vendor_boot_update:
 #                    ability to flash vendor_boot partition, inspect the usage of this
 #                      macro
@@ -58,6 +60,9 @@
 # have_custom_img_recovery:
 #                    defined when img-recovery is packaged separately
 #                      from droid-hal-device
+# have_custom_init_boot:
+#                    defined when init_boot is packaged separately from
+#                      droid-hal-device
 # have_custom_vendor_boot:
 #                    defined when vendor_boot is packaged separately from
 #                      droid-hal-device
@@ -341,10 +346,25 @@ Requires(post): droid-config-flashing
 %description kernel-dtbo
 %{summary}. Will stay empty, if dtbo image is not needed.
 
+%if 0%{!?have_custom_init_boot:1}
+################
+%package init_boot
+Summary: The init_boot img for droid-hal device: %{rpm_device}
+%if 0%{?enable_init_boot_update:1}
+# The device flashing info and scripts are in droid-configs
+Requires: oneshot
+Requires(post): droid-config-flashing
+%{_oneshot_requires_post}
+%endif
+
+%description init_boot
+The init_boot.img for device
+%endif
+
 %if 0%{!?have_custom_vendor_boot:1}
 %if 0%{?enable_vendor_boot_update:1}
 %package vendor_boot
-Summary: Placeholder for %{device} flashable vendor_boot if applicable
+Summary: The vendor_boot img for droid-hal device: %{rpm_device}
 # The device flashing info and scripts are in droid-configs
 Requires: oneshot
 Requires(post): droid-config-flashing
@@ -994,10 +1014,16 @@ fi
 # /boot and modules to /lib as normal
 kernel_release=$(sort -u out/target/product/%{device}/*/*/include/config/kernel.release)
 cp out/target/product/%{device}/kernel $RPM_BUILD_ROOT/boot/kernel-$kernel_release
-cp out/target/product/%{device}/obj/ROOT/hybris-boot_intermediates/boot-initramfs.gz $RPM_BUILD_ROOT/boot/
 
 echo "/boot/kernel-$kernel_release" > kernel.files
-echo "/boot/boot-initramfs.gz" >> kernel.files
+
+if cp out/target/product/%{device}/obj/ROOT/hybris-boot_intermediates/boot-initramfs.gz $RPM_BUILD_ROOT/boot/ &> /dev/null; then
+   echo "/boot/boot-initramfs.gz" >> kernel.files
+else
+if cp out/target/product/%{device}/obj/ROOT/hybris-init_boot_intermediates/boot-initramfs.gz $RPM_BUILD_ROOT/boot/ &> /dev/null; then
+   echo "/boot/boot-initramfs.gz" >> kernel.files
+fi
+fi
 
 if cp out/target/product/%{device}/dt.img $RPM_BUILD_ROOT/boot/ &> /dev/null; then
     echo /boot/dt.img >> kernel.files
@@ -1016,6 +1042,12 @@ fi
 %if 0%{!?have_custom_vendor_boot:1}
 %if 0%{?enable_vendor_boot_update:1}
 cp out/target/product/%{device}/vendor_boot.img $RPM_BUILD_ROOT/boot/
+%endif
+%endif
+
+%if 0%{!?have_custom_init_boot:1}
+%if 0%{?enable_init_boot_update:1}
+cp out/target/product/%{device}/hybris-init_boot.img $RPM_BUILD_ROOT/boot/
 %endif
 %endif
 
@@ -1114,6 +1146,17 @@ fi
 if [ $1 -ne 1 ] ; then
   add-preinit-oneshot /var/lib/platform-updates/flash-dtbo.sh || :
 fi
+%endif
+
+%if 0%{!?have_custom_init_boot:1}
+%if 0%{?enable_init_boot_update:1}
+%post init_boot
+# This oneshot is enabled only during package upgrades, as initial
+# installation is done when we flash device.
+if [ $1 -ne 1 ] ; then
+  add-preinit-oneshot /var/lib/platform-updates/flash-init_boot.sh || :
+fi
+%endif
 %endif
 
 %if 0%{!?have_custom_vendor_boot:1}
@@ -1265,11 +1308,19 @@ done
 %files kernel-dtbo -f dtbo.files
 %defattr(644,root,root,-)
 
+%if 0%{!?have_custom_init_boot:1}
+%if 0%{?enable_init_boot_update:1}
+%files init_boot
+%defattr(644,root,root,-)
+/boot/hybris-init_boot.img
+%endif
+%endif
+
 %if 0%{!?have_custom_vendor_boot:1}
 %if 0%{?enable_vendor_boot_update:1}
 %files vendor_boot
-/boot/vendor_boot.img
 %defattr(644,root,root,-)
+/boot/vendor_boot.img
 %endif
 %else
 %files kernel-modules-vendor_boot -f kernel-modules-vendor_boot.files
