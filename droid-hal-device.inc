@@ -1065,11 +1065,15 @@ cp -a out/target/product/%{device}/obj/*/modules.order $mod_dir/. || true
 
 %if 0%{?have_custom_vendor_boot:1}
 echo "" > kernel-modules-vendor_boot.files
+if [ -f out/target/product/%{device}/vendor-bootconfig.img ]; then
+    cp out/target/product/%{device}/vendor-bootconfig.img $RPM_BUILD_ROOT/boot/
+    echo "/boot/vendor-bootconfig.img" >> kernel-modules-vendor_boot.files
+fi
 if [ -d out/target/product/%{device}/vendor_ramdisk/lib/modules ]; then
     vendor_boot_mod_dir=$RPM_BUILD_ROOT/lib/vendor_boot_modules
     mkdir -p $vendor_boot_mod_dir
     cp -a out/target/product/%{device}/vendor_ramdisk/lib/modules/. $vendor_boot_mod_dir/. || true
-    echo "/lib/vendor_boot_modules/*" > kernel-modules-vendor_boot.files
+    echo "/lib/vendor_boot_modules/*" >> kernel-modules-vendor_boot.files
 fi
 %endif
 
