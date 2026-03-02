@@ -69,6 +69,9 @@ if [ x$MAJOR = x -o x$MINOR = x -o x$PATCH = x ]; then
         error "$VERSION_DEFAULTS not found"
     fi
 
+    if (grep -q string_value build/release/flag_values/*/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto); then
+    MAJOR=$(grep -ho "[0-9]*" build/release/flag_values/*/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto | sort -u -n -r | head -1)
+    else
     if [ $VERSION_DEFAULTS = $ANDROID_ROOT/build/core/version_defaults.mk ]; then
     IFS="." read MAJOR MINOR PATCH PATCH2 PATCH3 <<EOF
 $(IFS="." awk '/PLATFORM_VERSION([A-Z0-9.]*|_LAST_STABLE) := ([0-9.]+)/ { print $3; }' < $VERSION_DEFAULTS)
@@ -77,6 +80,7 @@ EOF
     IFS="." read MAJOR MINOR PATCH PATCH2 PATCH3 <<EOF
 $(IFS="." awk -F '"' '/PLATFORM_VERSION_LAST_STABLE.*([0-9.]+)\"/ { print $4; }' < $VERSION_DEFAULTS)
 EOF
+    fi
     fi
     if [ x$MINOR = x ]; then
          MINOR=0

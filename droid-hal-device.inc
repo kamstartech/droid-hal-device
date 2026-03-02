@@ -33,7 +33,9 @@
 # enable_dtbo_update:
 #                    ability to flash dtbo partition, inspect the usage of this
 #                      macro
-#
+# enable_init_boot_update:
+#                    ability to flash init_boot partition, inspect the usage of
+#                      this macro
 # enable_vendor_boot_update:
 #                    ability to flash vendor_boot partition, inspect the usage of this
 #                      macro
@@ -58,6 +60,9 @@
 # have_custom_img_recovery:
 #                    defined when img-recovery is packaged separately
 #                      from droid-hal-device
+# have_custom_init_boot:
+#                    defined when init_boot is packaged separately from
+#                      droid-hal-device
 # have_custom_vendor_boot:
 #                    defined when vendor_boot is packaged separately from
 #                      droid-hal-device
@@ -341,10 +346,25 @@ Requires(post): droid-config-flashing
 %description kernel-dtbo
 %{summary}. Will stay empty, if dtbo image is not needed.
 
+%if 0%{!?have_custom_init_boot:1}
+################
+%package init_boot
+Summary: The init_boot img for droid-hal device: %{rpm_device}
+%if 0%{?enable_init_boot_update:1}
+# The device flashing info and scripts are in droid-configs
+Requires: oneshot
+Requires(post): droid-config-flashing
+%{_oneshot_requires_post}
+%endif
+
+%description init_boot
+The init_boot.img for device
+%endif
+
 %if 0%{!?have_custom_vendor_boot:1}
 %if 0%{?enable_vendor_boot_update:1}
 %package vendor_boot
-Summary: Placeholder for %{device} flashable vendor_boot if applicable
+Summary: The vendor_boot img for droid-hal device: %{rpm_device}
 # The device flashing info and scripts are in droid-configs
 Requires: oneshot
 Requires(post): droid-config-flashing
@@ -453,7 +473,9 @@ hybris/mer-kernel-check/mer_verify_kernel_config \
     %{android_root}/out/target/product/%{device}/obj/*/.config
 
 
-if [ -f %{android_root}/build/release/build_flags.scl ]; then
+if (grep -q string_value build/release/flag_values/*/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto); then
+android_version_major=$(grep -ho "[0-9]*" build/release/flag_values/*/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto | sort -u -n -r | head -1)
+elif [ -f %{android_root}/build/release/build_flags.scl ]; then
 android_version_major=$(awk -F '"' '/PLATFORM_VERSION_LAST_STABLE.*([0-9.]+)\"/ { print $4; }' \
                           < %{android_root}/build/release/build_flags.scl \
                           | awk -F'.' '{print $1}')
@@ -581,7 +603,9 @@ EOF
 ################
 %install
 
-if [ -f %{android_root}/build/release/build_flags.scl ]; then
+if (grep -q string_value build/release/flag_values/*/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto); then
+android_version_major=$(grep -ho "[0-9]*" build/release/flag_values/*/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto | sort -u -n -r | head -1)
+elif [ -f %{android_root}/build/release/build_flags.scl ]; then
 android_version_major=$(awk -F '"' '/PLATFORM_VERSION_LAST_STABLE.*([0-9.]+)\"/ { print $4; }' \
                           < %{android_root}/build/release/build_flags.scl \
                           | awk -F'.' '{print $1}')
@@ -692,11 +716,15 @@ if [ $android_version_major -lt "13" ]; then
 echo "/default.prop" >> tmp/droid-hal.files
 fi
 
-cp -a %{android_root}/out/target/product/%{device}/system/{bin,lib} $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/.
+cp -a %{android_root}/out/target/product/%{device}/system/bin $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/.
+if [ -d %{android_root}/out/target/product/%{device}/system/lib ]; then
+echo "%{_libexecdir}/droid-hybris/system/lib/" >> tmp/droid-hal.files
+cp -a %{android_root}/out/target/product/%{device}/system/lib $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/.
+fi
 %if 0%{?droid_target_aarch64:1}
 cp -a %{android_root}/out/target/product/%{device}/system/lib64 $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/.
 %endif
-if [ $android_version_major -ge "10" ]; then
+if [ $android_version_major -ge "10" && $android_version_major -le "14" ]; then
     # Create empty /apex, /system/bin/apexd will then mount namespaces therein
     mkdir -p $RPM_BUILD_ROOT/apex
     echo "%dir /apex" >> tmp/droid-hal.files
@@ -720,11 +748,17 @@ if [ $android_version_major -ge "10" ]; then
         art_path=%{android_root}/out/target/product/%{device}
         apex_path=apex/com.android.runtime
     fi
+    if [ ! -f "$art_path/$apex_path/lib/bionic/libc.so" ]; then
+        art_path=%{android_root}/out/target/product/%{device}
+        apex_path=system/
+    fi
 
     rm -f $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib/lib{dl,dl_android,c,m}.so
-    cp -a \
-        $art_path/$apex_path/lib/bionic/lib{dl,dl_android,c,m}.so \
-        $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib
+    if [ -d $art_path/$apex_path/lib ]; then
+        cp -a \
+            $art_path/$apex_path/lib/bionic/lib{dl,dl_android,c,m}.so \
+            $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib
+    fi
 %if 0%{?droid_target_aarch64:1}
     rm -f $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64/lib{dl,dl_android,c,m}.so
     cp -a \
@@ -732,7 +766,27 @@ if [ $android_version_major -ge "10" ]; then
         $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64
 %endif
 fi
-
+if [ $android_version_major -ge "15" ]; then
+    # Create empty /apex, /system/bin/apexd will then mount namespaces therein
+    mkdir -p $RPM_BUILD_ROOT/apex
+    echo "%dir /apex" >> tmp/droid-hal.files
+    if [ $android_version_major -ge "14" ]; then
+        # Create empty /bootstrap-apex
+        mkdir -p $RPM_BUILD_ROOT/bootstrap-apex
+        echo "%dir /bootstrap-apex" >> tmp/droid-hal.files
+    fi
+%if 0%{?droid_target_aarch64:1}
+    rm -f $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64/lib{dl,dl_android,c,m}.so
+    cp -a \
+        %{android_root}/out/target/product/%{device}/system/lib64/bootstrap/lib{dl,dl_android,c,m}.so \
+        $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64
+%endif
+    if [ -f %{android_root}/out/target/product/%{device}/apex/com.android.runtime/bin/linkerconfig ]; then
+        cp -a \
+            %{android_root}/out/target/product/%{device}/apex/com.android.runtime/bin/linkerconfig \
+            $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/bin/
+    fi
+fi
 # Remove kernel modules if installed under /system/lib/modules
 rm -rf $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib/modules
 cp -a %{android_root}/out/target/product/%{device}/obj/include $RPM_BUILD_ROOT%{_includedir}/droid-devel/ || true
@@ -784,6 +838,12 @@ if (grep -q '^TARGET_USES_QCOM_BSP := true' %{android_root}/device/%{vendor}/*/B
 #define QTI_BSP 1
 EOF
 fi
+if [ $android_version_major -ge "15" ]; then
+    cat <<EOF >> $hdrs/android-config.h.new
+/* For Android 15+ */
+#define DISABLED_FOR_HYBRIS_SUPPORT
+EOF
+fi
 if [ $android_version_major -ge "13" ]; then
     cat <<EOF >> $hdrs/android-config.h.new
 /* For Android 13+ */
@@ -792,6 +852,12 @@ if [ $android_version_major -ge "13" ]; then
 #define _Nullable
 
 #include <android/versioning.h>
+EOF
+fi
+if [ $android_version_major -ge "15" ]; then
+    cat <<EOF >> $hdrs/android-config.h.new
+/* For Android 15+ */
+#include <android/api-level.h>
 EOF
 fi
 sed "1,$token_line d" $hdrs/android-config.h >> $hdrs/android-config.h.new
@@ -948,10 +1014,16 @@ fi
 # /boot and modules to /lib as normal
 kernel_release=$(sort -u out/target/product/%{device}/*/*/include/config/kernel.release)
 cp out/target/product/%{device}/kernel $RPM_BUILD_ROOT/boot/kernel-$kernel_release
-cp out/target/product/%{device}/obj/ROOT/hybris-boot_intermediates/boot-initramfs.gz $RPM_BUILD_ROOT/boot/
 
 echo "/boot/kernel-$kernel_release" > kernel.files
-echo "/boot/boot-initramfs.gz" >> kernel.files
+
+if cp out/target/product/%{device}/obj/ROOT/hybris-boot_intermediates/boot-initramfs.gz $RPM_BUILD_ROOT/boot/ &> /dev/null; then
+   echo "/boot/boot-initramfs.gz" >> kernel.files
+else
+if cp out/target/product/%{device}/obj/ROOT/hybris-init_boot_intermediates/boot-initramfs.gz $RPM_BUILD_ROOT/boot/ &> /dev/null; then
+   echo "/boot/boot-initramfs.gz" >> kernel.files
+fi
+fi
 
 if cp out/target/product/%{device}/dt.img $RPM_BUILD_ROOT/boot/ &> /dev/null; then
     echo /boot/dt.img >> kernel.files
@@ -973,24 +1045,35 @@ cp out/target/product/%{device}/vendor_boot.img $RPM_BUILD_ROOT/boot/
 %endif
 %endif
 
+%if 0%{!?have_custom_init_boot:1}
+%if 0%{?enable_init_boot_update:1}
+cp out/target/product/%{device}/hybris-init_boot.img $RPM_BUILD_ROOT/boot/
+%endif
+%endif
+
 touch boot.files
 
 mod_dir=$RPM_BUILD_ROOT/lib/modules/$kernel_release
 mkdir -p $mod_dir
-cp -a out/target/product/%{device}/system/lib/modules/. $mod_dir/. || true
-cp -a out/target/product/%{device}/system/vendor/lib/modules/. $mod_dir/. || true
-cp -a out/target/product/%{device}/vendor/lib/modules/. $mod_dir/. || true
-cp -a out/target/product/%{device}/vendor_dlkm/lib/modules/. $mod_dir/. || true
+find out/target/product/%{device}/system/lib/modules/. -name '*.ko' -exec cp -a {} $mod_dir/. ";" || true
+find out/target/product/%{device}/system/vendor/lib/modules/. -name '*.ko' -exec cp -a {} $mod_dir/. ";" || true
+find out/target/product/%{device}/system_dlkm/lib/modules/. -name '*.ko' -exec cp -a {} $mod_dir/. ";" || true
+find out/target/product/%{device}/vendor/lib/modules/. -name '*.ko' -exec cp -a {} $mod_dir/. ";" || true
+find out/target/product/%{device}/vendor_dlkm/lib/modules/. -name '*.ko' -exec cp -a {} $mod_dir/. ";" || true
 cp -a out/target/product/%{device}/obj/*/modules.builtin $mod_dir/. || true
 cp -a out/target/product/%{device}/obj/*/modules.order $mod_dir/. || true
 
 %if 0%{?have_custom_vendor_boot:1}
 echo "" > kernel-modules-vendor_boot.files
+if [ -f out/target/product/%{device}/vendor-bootconfig.img ]; then
+    cp out/target/product/%{device}/vendor-bootconfig.img $RPM_BUILD_ROOT/boot/
+    echo "/boot/vendor-bootconfig.img" >> kernel-modules-vendor_boot.files
+fi
 if [ -d out/target/product/%{device}/vendor_ramdisk/lib/modules ]; then
     vendor_boot_mod_dir=$RPM_BUILD_ROOT/lib/vendor_boot_modules
     mkdir -p $vendor_boot_mod_dir
     cp -a out/target/product/%{device}/vendor_ramdisk/lib/modules/. $vendor_boot_mod_dir/. || true
-    echo "/lib/vendor_boot_modules/*" > kernel-modules-vendor_boot.files
+    echo "/lib/vendor_boot_modules/*" >> kernel-modules-vendor_boot.files
 fi
 %endif
 
@@ -1069,6 +1152,17 @@ if [ $1 -ne 1 ] ; then
 fi
 %endif
 
+%if 0%{!?have_custom_init_boot:1}
+%if 0%{?enable_init_boot_update:1}
+%post init_boot
+# This oneshot is enabled only during package upgrades, as initial
+# installation is done when we flash device.
+if [ $1 -ne 1 ] ; then
+  add-preinit-oneshot /var/lib/platform-updates/flash-init_boot.sh || :
+fi
+%endif
+%endif
+
 %if 0%{!?have_custom_vendor_boot:1}
 %if 0%{?enable_vendor_boot_update:1}
 %post vendor_boot
@@ -1142,8 +1236,6 @@ done
 # Non executable files
 %defattr(644,root,root,-)
 %{_unitdir}
-# hybris and /dev/alog/ libraries
-%{_libexecdir}/droid-hybris/system/lib/
 # just /dev/alog/ libraries (for trying to run pure android apps)
 %{_libexecdir}/droid-hybris/lib-dev-alog/.
 # all of the above for 64bits
@@ -1220,11 +1312,19 @@ done
 %files kernel-dtbo -f dtbo.files
 %defattr(644,root,root,-)
 
+%if 0%{!?have_custom_init_boot:1}
+%if 0%{?enable_init_boot_update:1}
+%files init_boot
+%defattr(644,root,root,-)
+/boot/hybris-init_boot.img
+%endif
+%endif
+
 %if 0%{!?have_custom_vendor_boot:1}
 %if 0%{?enable_vendor_boot_update:1}
 %files vendor_boot
-/boot/vendor_boot.img
 %defattr(644,root,root,-)
+/boot/vendor_boot.img
 %endif
 %else
 %files kernel-modules-vendor_boot -f kernel-modules-vendor_boot.files
