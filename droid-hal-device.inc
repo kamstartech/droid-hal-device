@@ -724,7 +724,7 @@ fi
 %if 0%{?droid_target_aarch64:1}
 cp -a %{android_root}/out/target/product/%{device}/system/lib64 $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/.
 %endif
-if [ $android_version_major -ge "10" && $android_version_major -le "14" ]; then
+if [ $android_version_major -ge "10" ] && [ $android_version_major -le "14" ]; then
     # Create empty /apex, /system/bin/apexd will then mount namespaces therein
     mkdir -p $RPM_BUILD_ROOT/apex
     echo "%dir /apex" >> tmp/droid-hal.files
