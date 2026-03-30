@@ -724,7 +724,7 @@ fi
 %if 0%{?droid_target_aarch64:1}
 cp -a %{android_root}/out/target/product/%{device}/system/lib64 $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/.
 %endif
-if [ $android_version_major -ge "10" && $android_version_major -le "14" ]; then
+if [ $android_version_major -ge "10" ] && [ $android_version_major -le "14" ]; then
     # Create empty /apex, /system/bin/apexd will then mount namespaces therein
     mkdir -p $RPM_BUILD_ROOT/apex
     echo "%dir /apex" >> tmp/droid-hal.files
@@ -781,11 +781,11 @@ if [ $android_version_major -ge "15" ]; then
         %{android_root}/out/target/product/%{device}/system/lib64/bootstrap/lib{dl,dl_android,c,m}.so \
         $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib64
 %endif
-    if [ -f %{android_root}/out/target/product/%{device}/apex/com.android.runtime/bin/linkerconfig ]; then
-        cp -a \
-            %{android_root}/out/target/product/%{device}/apex/com.android.runtime/bin/linkerconfig \
-            $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/bin/
-    fi
+fi
+if [ -f %{android_root}/out/target/product/%{device}/apex/com.android.runtime/bin/linkerconfig ]; then
+    cp -a \
+        %{android_root}/out/target/product/%{device}/apex/com.android.runtime/bin/linkerconfig \
+        $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/bin/
 fi
 # Remove kernel modules if installed under /system/lib/modules
 rm -rf $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/lib/modules
