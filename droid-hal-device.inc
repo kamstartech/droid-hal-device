@@ -661,7 +661,9 @@ install -m 755 -D %{android_root}/system/core/libsparse/img2simg %{buildroot}/%{
 
 # Install
 %if 0%{?installable_zip:1}
-cp -a %{android_root}/out/target/product/%{device}/system/bin/updater $RPM_BUILD_ROOT/boot/update-binary
+updater_src=%{android_root}/out/target/product/%{device}/system/bin/updater
+[ -e "$updater_src" ] || updater_src=%{android_root}/out/target/product/%{device}/symbols/system/bin/updater
+cp -a "$updater_src" $RPM_BUILD_ROOT/boot/update-binary
 cp -a %{android_root}/out/target/product/%{device}/hybris-updater-script $RPM_BUILD_ROOT/boot
 cp -a %{android_root}/out/target/product/%{device}/hybris-updater-unpack.sh $RPM_BUILD_ROOT/boot
 %endif
@@ -701,7 +703,6 @@ fi
 
 if [ $android_version_major -ge "12" ]; then
 cp -a %{android_root}/out/target/product/%{device}/system/etc/init/apexd.rc $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/etc/init/
-echo "%{_libexecdir}/droid-hybris/system/etc/init/apexd.rc" >> tmp/droid-hal.files
 fi
 
 if [ -f %{android_root}/out/target/product/%{device}/system/etc/init/hybris_extras.rc ]; then
@@ -715,6 +716,10 @@ fi
 if [ $android_version_major -lt "13" ]; then
 echo "/default.prop" >> tmp/droid-hal.files
 fi
+echo "/adb_keys" >> tmp/droid-hal.files
+echo "/bugreports" >> tmp/droid-hal.files
+echo "/d" >> tmp/droid-hal.files
+echo "/sdcard" >> tmp/droid-hal.files
 
 cp -a %{android_root}/out/target/product/%{device}/system/bin $RPM_BUILD_ROOT%{_libexecdir}/droid-hybris/system/.
 if [ -d %{android_root}/out/target/product/%{device}/system/lib ]; then
@@ -810,13 +815,33 @@ echo "Extracting headers for hybris"
 # This is copied from libhybris and should be kept in-sync:
 %{dhd_path}/helpers/extract-headers.sh -p %{_includedir}/droid-devel/droid-headers . $hdrs/ > /dev/null
 if [ -d "%{android_root}/rpm/header_patches" ]; then
-    %{dhd_path}/helpers/patch-headers.sh "$hdrs" "%{android_root}/rpm/header_patches"/*.patch
+    set -- "%{android_root}/rpm/header_patches"/*.patch
+    if [ -e "$1" ]; then
+        %{dhd_path}/helpers/patch-headers.sh "$hdrs" "$@"
+    fi
 fi
 %else
 pushd %{android_root}/rpm/droid-headers 1>/dev/null
 make install DESTDIR=$RPM_BUILD_ROOT PREFIX=%{_prefix} INCLUDEDIR=%{_includedir}/droid-devel/droid-headers
 popd 1>/dev/null
 %endif
+
+if [ $android_version_major -ge "15" ] && [ -f "$hdrs/vndk/hardware_buffer.h" ]; then
+    awk '
+        /^enum AHardwareBufferStatus : int32_t \{$/ {
+            print "#ifdef HYBRIS_BUILD"
+            print "// hybris: gcc does not support typed-enum (enum Foo : type) syntax;"
+            print "// use plain enum so the hybris adaptation tree can compile with gcc"
+            print "enum AHardwareBufferStatus {"
+            print "#else"
+            print $0
+            print "#endif"
+            next
+        }
+        { print }
+    ' "$hdrs/vndk/hardware_buffer.h" > "$hdrs/vndk/hardware_buffer.h.new"
+    mv "$hdrs/vndk/hardware_buffer.h.new" "$hdrs/vndk/hardware_buffer.h"
+fi
 
 # Add our config into the default android-config.h
 echo Making new $hdrs/android-config.h
@@ -841,23 +866,17 @@ fi
 if [ $android_version_major -ge "15" ]; then
     cat <<EOF >> $hdrs/android-config.h.new
 /* For Android 15+ */
+#define HYBRIS_BUILD 1
 #define DISABLED_FOR_HYBRIS_SUPPORT
-EOF
-fi
-if [ $android_version_major -ge "13" ]; then
-    cat <<EOF >> $hdrs/android-config.h.new
-/* For Android 13+ */
-#define __BIONIC_VERSIONER
-#define _Nonnull
+#ifndef __INTRODUCED_IN
+#define __INTRODUCED_IN(__api_level)
+#endif
+#ifndef _Nullable
 #define _Nullable
-
-#include <android/versioning.h>
-EOF
-fi
-if [ $android_version_major -ge "15" ]; then
-    cat <<EOF >> $hdrs/android-config.h.new
-/* For Android 15+ */
-#include <android/api-level.h>
+#endif
+#ifndef _Nonnull
+#define _Nonnull
+#endif
 EOF
 fi
 sed "1,$token_line d" $hdrs/android-config.h >> $hdrs/android-config.h.new

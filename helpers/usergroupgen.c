@@ -29,6 +29,16 @@
 
 #include "generated_android_filesystem_config.h"
 #include <stdio.h>
+#include <string.h>
+
+static const char *alias_name(const char *name)
+{
+    if (strcmp(name, "dbus") == 0) {
+        return "messagebus";
+    }
+
+    return name;
+}
 
 int main(int argc, char *argv[])
 {
@@ -44,8 +54,8 @@ int main(int argc, char *argv[])
             /* Skip creating/removing the root user */
             continue;
         } else {
-            /* List user-group entries */
-            printf("%s %i\n", android_ids[i].name, android_ids[i].aid);
+            /* Preserve distro service-account names when Android AIDs collide. */
+            printf("%s %i\n", alias_name(android_ids[i].name), android_ids[i].aid);
         }
     }
 

@@ -103,21 +103,34 @@ get_package_version() {
         if [ "$BUILDOFFLINE" = "1" ]; then
             die "Could not get version for $pkg: make sure it is cloned without --depth=1 or clone-depth=\"1\""
         else
-            unshallow_attempt=$(git fetch --unshallow 2>&1)
-            ret=$?
-            if [ $ret -ne 0 ]; then
-                # Most probable error: --unshallow on a complete repository does not make sense
-                # in which case there's not much we can do if the tags are still not available
-                die "Could not get version for $pkg: $unshallow_attempt"
-            elif [ -z "$unshallow_attempt" ]; then
-                # --unshallow output was empty, it means remote "origin" doesn't exist (cloned via repo sync)
-                remotes=$(git remote)
-                if [ -n "$remotes" ] &&
-                   [ "$(echo "$remotes" | wc -w)" -gt 1 ]; then
-                    die "Could not get version for $pkg: there is more than one remote to fetch tags from. Please fetch manually."
-                elif ! unshallow_attempt=$(git fetch --unshallow "$remotes" 2>&1); then
-                    die "Could not get version for $pkg: $unshallow_attempt"
+            fetch_remote=
+            remotes=$(git remote)
+            if echo "$remotes" | grep -qx origin; then
+                fetch_remote=origin
+            elif [ -n "$remotes" ] && [ "$(echo "$remotes" | wc -w)" -eq 1 ]; then
+                fetch_remote=$remotes
+            elif [ -n "$remotes" ]; then
+                die "Could not get version for $pkg: there is more than one remote to fetch tags from. Please fetch manually."
+            fi
+
+            if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+                if [ -n "$fetch_remote" ]; then
+                    unshallow_attempt=$(git fetch --unshallow --tags "$fetch_remote" 2>&1)
+                else
+                    unshallow_attempt=$(git fetch --unshallow --tags 2>&1)
                 fi
+                ret=$?
+            else
+                if [ -n "$fetch_remote" ]; then
+                    unshallow_attempt=$(git fetch --tags "$fetch_remote" 2>&1)
+                else
+                    unshallow_attempt=$(git fetch --tags 2>&1)
+                fi
+                ret=$?
+            fi
+
+            if [ $ret -ne 0 ]; then
+                die "Could not get version for $pkg: $unshallow_attempt"
             fi
             version=$(get_last_tag)
             if [ -z "$version" ]; then
@@ -240,7 +253,8 @@ buildmw() {
             sdk-assistant maintain $VENDOR-$DEVICE-$PORT_ARCH zypper -n install ccache>>$LOG 2>&1|| die "can't install ccache"
         fi
 
-        if [ -d "$ANDROID_ROOT/external/$PKG" ]; then
+        if [ -d "$ANDROID_ROOT/external/$PKG" ] &&
+           { [ -n "$MW_BUILDSPEC" ] || [ -d "$ANDROID_ROOT/external/$PKG/rpm" ]; }; then
             pushd "$ANDROID_ROOT/external" > /dev/null || die
 
             minfo "Source code directory exists in \$ANDROID_ROOT/external. Building the existing version. Make sure to update this version by updating the manifest, if required."
@@ -358,4 +372,3 @@ buildpkg() {
     build $PKG "$@"
     popd > /dev/null
 }
-

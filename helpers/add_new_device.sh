@@ -2,7 +2,7 @@
 # droid-hal device add script
 # Copyright (c) 2014 Jolla Ltd.
 # Contact: Simonas Leleiva <simonas.leleiva@jollamobile.com>
-
+export DEVICE=perseus
 if [ -z $DEVICE ]; then
     echo 'Error: $DEVICE is undefined. Please run hadk'
     exit 1
